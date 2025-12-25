@@ -18,6 +18,7 @@ class PreprocessData:
         self.fitted_svd = None
 
     def join_data(self) -> pd.DataFrame:
+        # join claims, usage, visits, churn_labels and shuffle
         self.process_claims()
         self.process_usage()
         self.process_visits()
@@ -32,21 +33,22 @@ class PreprocessData:
         return df_merged
 
     def process_claims(self) -> None:
+        # perform dummies on icd_code column
         dummies = pd.get_dummies(self.df_claims['icd_code'], prefix='icd_code')
         self.df_claims = pd.concat([self.df_claims.reset_index(drop=True), dummies.reset_index(drop=True)], axis=1)
         self.df_claims = self.df_claims.groupby('member_id').agg({col: 'sum' for col in dummies.columns}).reset_index()
-        # self.df_claims.drop(columns=['icd_code','diagnosis_date'], inplace=True)
 
     def process_usage(self) -> None:
+        # compute gap stats for usage timestamps
         self.df_usage = self.df_usage.groupby('member_id')['timestamp'].apply(lambda x: self.gap_stats(x, prefix='usage')).unstack().reset_index()
         self.df_usage = self.df_usage.drop(columns=['level_1']) if 'level_1' in self.df_usage.columns else self.df_usage
 
     def process_visits(self) -> None:
-        # embeddings for 'title' + 'description' using SentenceTransformer
+        # process visits data - create embeddings and aggregate, create dummies + stats and aggregate + compute gap stats
+
         self.df_visits['text_to_embed'] = self.df_visits['title'].fillna('') + ' ' + self.df_visits['description'].fillna('')
         self.embedd_column(col='text_to_embed')
 
-        # perform dummies on title column
         dummies = pd.get_dummies(self.df_visits['title'], prefix='page')
         self.df_visits = pd.concat([self.df_visits.reset_index(drop=True), dummies.reset_index(drop=True)], axis=1)
 
@@ -54,6 +56,7 @@ class PreprocessData:
         self.aggregate_visits()
 
     def gap_stats(self, group, prefix='visits'):
+        # compute gap statistics for a group of timestamps
         if len(group) < 2:
             return pd.Series([0]*6, index=[f'{prefix}_gap_mean', f'{prefix}_gap_median', f'{prefix}_gap_min', f'{prefix}_gap_max', f'{prefix}_gap_skew', f'{prefix}_gap_kurt'])
         
@@ -69,6 +72,7 @@ class PreprocessData:
         }).fillna(0)
 
     def aggregate_visits(self) -> pd.DataFrame:
+        # aggregate visits data (after embedding and dummies)
         agg_dict_emb = {col: ['mean','std'] for col in self.df_visits.columns if col.startswith('visit_emb_')}
         agg_dict_page = {col: 'sum' for col in self.df_visits.columns if col.startswith('page')}
 
@@ -83,6 +87,8 @@ class PreprocessData:
         self.df_visits = self.df_visits.merge(gap_df, on='member_id', how='left')
         
     def embedd_column(self, col='text_to_embed', n_dims=50) -> pd.DataFrame:
+        # create embeddings for a text column using SentenceTransformer + reduce dimensions with TruncatedSVD
+        
         df_unique_texts = self.df_visits[col].fillna('').unique().tolist()
         embeddings = self.model.encode(df_unique_texts)
         if n_dims < embeddings.shape[1]:

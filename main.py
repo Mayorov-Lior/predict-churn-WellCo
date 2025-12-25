@@ -6,7 +6,7 @@ import xgboost as xgb
 from sklearn.metrics import roc_auc_score, classification_report
 
 class PredictChurn:
-    def __init__(self, check_validation=True):
+    def __init__(self, check_validation:bool=True):
         self.check_validation = check_validation
         if self.check_validation:
             self.df_usage, self.df_visits, self.df_claims, self.df_churn_labels = self.read_data(train=True)
@@ -18,7 +18,7 @@ class PredictChurn:
         self.df_test = None
         self.preprocess_data()    
 
-    def read_data(self, train=True):
+    def read_data(self, train:bool=True):
         folder = 'train/' if train else 'test/test_'
         df_usage = pd.read_csv(f'{folder}app_usage.csv') # pd.read_csv('test/test_app_usage.csv') 
         df_visits = pd.read_csv(f'{folder}web_visits.csv')
@@ -27,6 +27,7 @@ class PredictChurn:
         return df_usage, df_visits, df_claims, df_churn_labels
 
     def split_data(self):
+        # split 90% train, 10% test (validation) by member_id )
         random.seed(42)
         members = list(set(self.df_visits['member_id'].unique().tolist() + self.df_claims['member_id'].unique().tolist() + self.df_usage['member_id'].unique().tolist()))
         train_size = int(0.9 * len(members))
@@ -46,6 +47,7 @@ class PredictChurn:
         print(self.df_churn_labels_test['churn'].value_counts())
 
     def preprocess_data(self):
+        # preprocess train and test data
         train_preprocessor = PreprocessData(df_usage=self.df_usage_train, df_visits=self.df_visits_train, df_claims=self.df_claims_train, df_churn_labels=self.df_churn_labels_train)
         df_train = train_preprocessor.join_data()
 
@@ -53,12 +55,12 @@ class PredictChurn:
         self.df_test = test_preprocessor.join_data()
 
         df_train.drop(columns=['outreach','signup_date'], inplace=True) # if had more time, would have engineered features from these
-        # df_test.drop(columns=['outreach','signup_date'], inplace=True)
 
         self.X_train, self.y_train = df_train.drop(columns=['member_id', 'churn']), df_train['churn']
         self.X_test, self.y_test = self.df_test.drop(columns=['member_id', 'churn', 'outreach','signup_date']), self.df_test['churn']
 
-    def train_model_and_predict(self, th=0.5, top_percentage=1):
+    def train_model_and_predict(self, th:float=0.5, top_percentage:float=1):
+        # train XGBoost model, predict on test set and return results
         scale_pos_weight = len(self.y_train[self.y_train==0]) / len(self.y_train[self.y_train==1])
         model = xgb.XGBClassifier(scale_pos_weight=scale_pos_weight,max_depth=1, learning_rate=0.2, n_estimators=50, objective='binary:logistic') # 0.66
 
