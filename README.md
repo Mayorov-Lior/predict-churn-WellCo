@@ -8,17 +8,20 @@ Follow these steps to set up and run the project.
 ```bash
 git clone https://github.com/Mayorov-Lior/predict-churn-WellCo.git
 cd predict-churn-WellCo
+```
 
 ### 2. install requirements
+```bash
 pip install -r requirements.txt
+```
 This code was run with python 3.12.7 on a Windows machine.
 
 ### 3. run code
 The notebook cost_analysis.ipynb shows how to load, train and inspect the training and test data:
-
+```bash
 pc = PredictChurn(check_validation=True)
 df_results_train, df_results_test = pc.train_model_and_predict()
-
+```
 You can set check_validation=True to test results on the validation set (random 10% of train users) or set check_validation=False to test the test set.
 
 ### Approach
